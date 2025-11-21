@@ -61,7 +61,7 @@ resource "aws_instance" "windows_ad_instance" {
   user_data = templatefile("./scripts/userdata.ps1", {
     admin_secret = "admin_ad_credentials"
     domain_fqdn  = var.dns_zone
-    samba_server = aws_instance.xubuntu_instance.private_dns
+    samba_server = aws_instance.mate_instance.private_dns
   })
 
   # ----------------------------------------------------------------------------------------------
@@ -77,5 +77,5 @@ resource "aws_instance" "windows_ad_instance" {
   # ----------------------------------------------------------------------------------------------
   # Ensure that the Samba/EFS client instance is created first,
   # since this admin box may connect to it for management tasks.
-  depends_on = [aws_instance.xubuntu_instance]
+  depends_on = [aws_instance.mate_instance]
 }
