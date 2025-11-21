@@ -37,7 +37,7 @@ The result is a **disposable, reproducible, cloud-hosted Linux workstation** tha
 can be launched in minutes and used for **any build, automation, or cloud project**
 featured on the channel.  
 
-![AWS diagram](aws-MATE.png)
+![AWS diagram](aws-mate.png)
 
 ## Prerequisites
 
