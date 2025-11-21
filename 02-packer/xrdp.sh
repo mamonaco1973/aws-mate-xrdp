@@ -42,7 +42,9 @@ if test -r ~/.profile; then
     . ~/.profile
 fi
 
-startxfce4
+# Start MATE session
+mate-session
+
 EOF
 
 # ================================================================================
