@@ -14,7 +14,7 @@ project, this solution automatically provisions:
    - Preloaded with Chrome, Firefox (deb), VS Code, Docker, KRDC, Postman  
    - Includes all development tooling required across channel projects:  
      **Packer, Terraform, Docker CLI, AWS CLI v2, Azure CLI, Google Cloud CLI**  
-   - Snap-free, clean, lightweight Xfce desktop  
+   - Snap-free, clean, lightweight MATE desktop  
    - XRDP fully configured with all required fixes and defaults  
    - Desktop/panel icons, terminal emulator defaults, `/etc/skel` customizations  
 
@@ -116,7 +116,7 @@ When the deployment completes, the following resources are created:
 
 - **Packer-Built MATE XRDP AMI:**  
   - Custom AMI containing:  
-    - MATE (XFCE), XRDP, Chrome, Firefox (deb), VS Code  
+    - MATE, XRDP, Chrome, Firefox (deb), VS Code  
     - Development tools: **Packer, Terraform, Docker CLI, AWS CLI v2, Azure CLI, Google Cloud CLI**  
     - KRDC, Postman, and all channel-wide prerequisites  
   - `/etc/skel` configured for default desktop icons, terminal emulator, wallpaper  
