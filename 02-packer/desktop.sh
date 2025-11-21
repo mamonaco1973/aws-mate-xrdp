@@ -7,7 +7,7 @@ set -euo pipefail
 # Description:
 #   Creates trusted symlinks for selected applications inside /etc/skel/Desktop.
 #   These symlinks ensure that all newly created users receive desktop icons
-#   without the XFCE "untrusted application launcher" warning dialog.
+#   without the MATE "untrusted application launcher" warning dialog.
 #
 # Notes:
 #   - Works for XFCE, MATE, and most desktop environments using .desktop files.
@@ -53,3 +53,6 @@ done
 echo "NOTE: All new users will receive these desktop icons without trust prompts."
 
 rm -f -r /etc/xdg/autostart/mate-power-manager.desktop
+
+sudo sed -i 's/enabled=1/enabled=0/' /etc/default/apport
+sudo systemctl disable --now apport.service
