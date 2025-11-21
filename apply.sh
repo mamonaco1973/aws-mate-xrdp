@@ -5,16 +5,16 @@
 # Description:
 #   Automates a two-phase AWS build:
 #     1. Deploys an AD Domain Controller.
-#     2. Builds a Packer AMI for Xubuntu XRDP.
+#     2. Builds a Packer AMI for MATE XRDP.
 #     3. Deploys EC2 servers that join the AD domain.
 #
 # Goal:
-#   Produce a fully configured Xubuntu XRDP server joined to the AD domain.
+#   Produce a fully configured MATE XRDP server joined to the AD domain.
 #
 # Key Features:
 #   - Runs environment checks before starting the build.
 #   - Uses Terraform modules for predictable deployments.
-#   - Builds a custom Xubuntu XRDP AMI using Packer.
+#   - Builds a custom MATE XRDP AMI using Packer.
 #   - Ensures servers deploy only after AD is available.
 #   - Runs validation checks after all phases complete.
 #
@@ -69,9 +69,9 @@ terraform apply -auto-approve           # Build AD module
 cd .. || exit
 
 # ------------------------------------------------------------------------------------------------
-# Phase 2: Build Xubuntu XRDP AMI with Packer
+# Phase 2: Build MATE XRDP AMI with Packer
 # ------------------------------------------------------------------------------------------------
-# Creates the custom Xubuntu XRDP AMI used by the server module. Networking
+# Creates the custom MATE XRDP AMI used by the server module. Networking
 # values are pulled dynamically from the AD VPC to ensure compatibility.
 # ------------------------------------------------------------------------------------------------
 
@@ -89,11 +89,11 @@ subnet_id=$(aws ec2 describe-subnets \
 
 cd 02-packer || { echo "ERROR: Missing 02-packer dir"; exit 1; }
 
-echo "NOTE: Building Xubuntu XRDP AMI with Packer..."
+echo "NOTE: Building MATE XRDP AMI with Packer..."
 
-packer init ./xubuntu_ami.pkr.hcl
+packer init ./mate_ami.pkr.hcl
 packer build -var "vpc_id=$vpc_id" -var "subnet_id=$subnet_id" \
-  ./xubuntu_ami.pkr.hcl || {
+  ./mate_ami.pkr.hcl || {
     echo "ERROR: Packer build failed. Aborting."
     cd ..
     exit 1
@@ -104,7 +104,7 @@ cd .. || exit
 # ------------------------------------------------------------------------------------------------
 # Phase 3: Build EC2 Server Instances
 # ------------------------------------------------------------------------------------------------
-# Deploys EC2 servers that rely on the AD domain. This includes the Xubuntu
+# Deploys EC2 servers that rely on the AD domain. This includes the MATE
 # XRDP instance built from the custom AMI created in Phase 2.
 # ------------------------------------------------------------------------------------------------
 echo "NOTE: Building EC2 server instances..."

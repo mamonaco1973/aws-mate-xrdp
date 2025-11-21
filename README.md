@@ -1,7 +1,7 @@
-# AWS Xubuntu XRDP Cloud Development Environment  
+# AWS MATE XRDP Cloud Development Environment  
 
 This project provides a **complete cloud-based Linux desktop development environment**
-powered by **Xubuntu + XRDP**, **Mini-Active Directory**, and **Amazon EFS**.  
+powered by **MATE + XRDP**, **Mini-Active Directory**, and **Amazon EFS**.  
 It is designed as a **universal dev workstation** that contains the full superset of
 tools, dependencies, and configurations used across all build projects on my channel.
 
@@ -10,7 +10,7 @@ tools, dependencies, and configurations used across all build projects on my cha
 Instead of manually configuring a workstation for each tutorial, demo, or cloud
 project, this solution automatically provisions:
 
-1. **A Custom Xubuntu XRDP AMI (Packer)**
+1. **A Custom MATE XRDP AMI (Packer)**
    - Preloaded with Chrome, Firefox (deb), VS Code, Docker, KRDC, Postman  
    - Includes all development tooling required across channel projects:  
      **Packer, Terraform, Docker CLI, AWS CLI v2, Azure CLI, Google Cloud CLI**  
@@ -24,7 +24,7 @@ project, this solution automatically provisions:
    - Central authentication for Linux and Windows clients  
 
 3. **Domain-Joined Linux Desktop Server (Terraform)**
-   - Deploys Xubuntu XRDP instance using the Packer-built AMI  
+   - Deploys MATE XRDP instance using the Packer-built AMI  
    - Automatically joins AD during boot 
    - Consistent user profiles via `/etc/skel` provisioning  
 
@@ -37,7 +37,7 @@ The result is a **disposable, reproducible, cloud-hosted Linux workstation** tha
 can be launched in minutes and used for **any build, automation, or cloud project**
 featured on the channel.  
 
-![AWS diagram](aws-xubuntu.png)
+![AWS diagram](aws-MATE.png)
 
 ## Prerequisites
 
@@ -53,8 +53,8 @@ If this is your first time watching our content, we recommend starting with this
 ## Download this Repository
 
 ```bash
-git clone https://github.com/mamonaco1973/aws-xubuntu-xrdp.git
-cd aws-xubuntu-xrdp
+git clone https://github.com/mamonaco1973/aws-mate-xrdp.git
+cd aws-mate-xrdp
 ```
 
 ---
@@ -64,7 +64,7 @@ cd aws-xubuntu-xrdp
 Run [check_env](check_env.sh) to validate your environment, then run [apply](apply.sh) to provision the infrastructure.
 
 ```bash
-develop-vm:~/aws-efs$ ./apply.sh
+develop-vm:~/aws-mate-xrdp$ ./apply.sh
 NOTE: Validating that required commands are found in your PATH.
 NOTE: aws is found in the current PATH.
 NOTE: terraform is found in the current PATH.
@@ -94,7 +94,7 @@ When the deployment completes, the following resources are created:
 - **Networking:**  
   - A dedicated VPC with public and private subnets  
   - Internet Gateway and optional NAT Gateway for controlled outbound access  
-  - Route tables configured to support AD, EFS, and the Xubuntu XRDP servers  
+  - Route tables configured to support AD, EFS, and the MATE XRDP servers  
 
 - **Security & IAM:**  
   - Security groups for the domain controller, Linux desktop servers, Windows admin server, and EFS  
@@ -114,9 +114,9 @@ When the deployment completes, the following resources are created:
   - Security groups allowing NFS traffic (TCP/2049) from all XRDP servers  
   - Serves as shared home directory storage for all Linux desktop instances  
 
-- **Packer-Built Xubuntu XRDP AMI:**  
+- **Packer-Built MATE XRDP AMI:**  
   - Custom AMI containing:  
-    - Xubuntu (XFCE), XRDP, Chrome, Firefox (deb), VS Code  
+    - MATE (XFCE), XRDP, Chrome, Firefox (deb), VS Code  
     - Development tools: **Packer, Terraform, Docker CLI, AWS CLI v2, Azure CLI, Google Cloud CLI**  
     - KRDC, Postman, and all channel-wide prerequisites  
   - `/etc/skel` configured for default desktop icons, terminal emulator, wallpaper  
@@ -193,7 +193,7 @@ Follow these steps to provision a new user in the Active Directory domain and va
    - Open **PowerShell** on the AD server.  
    - Run the script located at:  
      ```powershell
-     Z:\efs\aws-xubuntu-xrdp\04-utils\getNextUID.bat
+     Z:\efs\aws-MATE-xrdp\04-utils\getNextUID.bat
      ```  
    - This script returns the next available **`uidNumber`** to assign to the new account.  
 
@@ -211,7 +211,7 @@ Follow these steps to provision a new user in the Active Directory domain and va
      - **us** (or other geographic/departmental group as applicable).  
 
 8. **Validate User on Linux**  
-   - Open an **AWS Systems Manager (SSM)** session to the **`xubuntu-instance`** instance.  
+   - Open an **AWS Systems Manager (SSM)** session to the **`MATE-instance`** instance.  
    - Run the following command to confirm the user’s identity mapping:  
      ```bash
      id mcloud

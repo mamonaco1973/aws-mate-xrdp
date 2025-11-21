@@ -9,7 +9,7 @@
 #   - AWS CLI installed and configured with credentials/permissions.
 #   - Instances must be tagged with:
 #       * Name = windows-ad-instance
-#       * Name = efs-client-instance
+#       * Name = mate-instance
 # --------------------------------------------------------------------------------------------------
 
 # --------------------------------------------------------------------------------------------------
@@ -35,12 +35,12 @@ fi
 # Lookup Linux AD Instance
 # --------------------------------------------------------------------------------------------------
 linux_dns=$(aws ec2 describe-instances \
-  --filters "Name=tag:Name,Values=xubuntu-instance" \
+  --filters "Name=tag:Name,Values=mate-instance" \
   --query 'Reservations[].Instances[].PublicDnsName' \
   --output text)
 
 if [ -z "$linux_dns" ]; then
-  echo "WARN: No Linux AD instance found with tag Name=xubuntu-instance"
+  echo "WARN: No Linux AD instance found with tag Name=mate-instance"
 else
-  echo "NOTE: Xubuntu Desktop Instance DNS:   $(echo $linux_dns | xargs)"
+  echo "NOTE: MATE Desktop Instance DNS:   $(echo $linux_dns | xargs)"
 fi

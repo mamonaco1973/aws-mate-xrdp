@@ -3,7 +3,7 @@ data "aws_ami" "latest_desktop_ami" {
 
   filter {
     name   = "name"                     # Filter AMIs by name pattern
-    values = ["xubuntu_ami*"]           # Match AMI names starting with "xubuntu_ami"
+    values = ["mate_ami*"]           # Match AMI names starting with "xubuntu_ami"
   }
 
   filter {
@@ -15,12 +15,12 @@ data "aws_ami" "latest_desktop_ami" {
 }
 
 # ================================================================================================
-# EC2 Instance: Xubuntu Desktop
+# EC2 Instance: MATE Desktop
 # ================================================================================================
 # Provisions an Ubuntu 24.04 EC2 instance that mounts an Amazon EFS file system and
 # integrates into an Active Directory (AD) environment.
 # ================================================================================================
-resource "aws_instance" "xubuntu_instance" {
+resource "aws_instance" "mate_instance" {
 
   # ----------------------------------------------------------------------------------------------
   # Amazon Machine Image (AMI)
@@ -95,7 +95,7 @@ resource "aws_instance" "xubuntu_instance" {
   # ----------------------------------------------------------------------------------------------
   # Standard AWS tagging for identification, cost tracking, and automation workflows.
   tags = {
-    Name = "xubuntu-instance"
+    Name = "mate-instance"
   }
 
   # ----------------------------------------------------------------------------------------------

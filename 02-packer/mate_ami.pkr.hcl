@@ -1,10 +1,10 @@
 # ==========================================================================================
-# Packer Build: Xubuntu AMI on Ubuntu 24.04 (Noble)
+# Packer Build: MATE AMI on Ubuntu 24.04 (Noble)
 # ------------------------------------------------------------------------------------------
 # Purpose:
-#   - Uses Packer to build a custom Amazon Machine Image (AMI) for Xubuntu XRDP
+#   - Uses Packer to build a custom Amazon Machine Image (AMI) for MATE XRDP
 #   - Starts from the official Canonical Ubuntu 24.04 AMI
-#   - Installs prerequisites (SSM agent, AWS CLI, packages, Xubuntu Server)
+#   - Installs prerequisites (SSM agent, AWS CLI, packages, MATE Server)
 #   - Produces a tagged, timestamped AMI for later use in Terraform or EC2 launches
 # ==========================================================================================
 
@@ -70,12 +70,12 @@ variable "subnet_id" {
 # - Provisions software and configuration
 # - Creates a reusable AMI with a timestamp-based name
 # ------------------------------------------------------------------------------------------
-source "amazon-ebs" "xubuntu_ami" {
+source "amazon-ebs" "mate_ami" {
   region        = var.region                       # AWS region
   instance_type = var.instance_type                # EC2 instance type
   source_ami    = data.amazon-ami.ubuntu_2404.id   # Base Ubuntu 24.04 AMI
   ssh_username  = "ubuntu"                         # Default SSH user for Ubuntu
-  ami_name      = "xubuntu_ami_${replace(timestamp(), ":", "-")}" # Timestamped AMI name
+  ami_name      = "mate_ami_${replace(timestamp(), ":", "-")}" # Timestamped AMI name
   ssh_interface = "public_ip"                      # Use public IP for provisioning
   vpc_id        = var.vpc_id                       # Target VPC
   subnet_id     = var.subnet_id                    # Target Subnet (must allow outbound internet)
@@ -89,7 +89,7 @@ source "amazon-ebs" "xubuntu_ami" {
   }
 
   tags = {
-    Name = "xubuntu_ami_${replace(timestamp(), ":", "-")}" # Tag AMI with unique name
+    Name = "mate_ami_${replace(timestamp(), ":", "-")}" # Tag AMI with unique name
   }
 }
 
@@ -100,7 +100,7 @@ source "amazon-ebs" "xubuntu_ami" {
 # - Each script installs a specific set of software or config
 # ------------------------------------------------------------------------------------------
 build {
-  sources = ["source.amazon-ebs.xubuntu_ami"]
+  sources = ["source.amazon-ebs.mate_ami"]
 
   # Install base packages and dependencies
   provisioner "shell" {
@@ -108,9 +108,9 @@ build {
     execute_command = "sudo -E bash '{{.Path}}'"
   }
 
-  # Install Xubuntu Desktop
+  # Install MATE Desktop
   provisioner "shell" {
-    script          = "./xubuntu.sh"
+    script          = "./mate.sh"
     execute_command = "sudo -E bash '{{.Path}}'"
   }
 
