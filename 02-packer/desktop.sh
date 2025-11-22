@@ -24,6 +24,7 @@ APPS=(
   /usr/share/applications/code.desktop
   /usr/share/applications/postman.desktop
   /usr/share/applications/mate-terminal.desktop
+  /usr/share/applications/onlyoffice-desktopeditors.desktop
 )
 
 SKEL_DESKTOP="/etc/skel/Desktop"

@@ -133,7 +133,7 @@ build {
     script          = "./firefox.sh"
     execute_command = "sudo -E bash '{{.Path}}'"
   }
-  
+
   # Install VS Code
 
   provisioner "shell" {
@@ -181,6 +181,13 @@ build {
 
   provisioner "shell" {
     script          = "./postman.sh"
+    execute_command = "sudo -E bash '{{.Path}}'"
+  }
+
+  # Install OnlyOffice
+
+  provisioner "shell" {
+    script          = "./onlyoffice.sh"
     execute_command = "sudo -E bash '{{.Path}}'"
   }
 
