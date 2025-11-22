@@ -21,7 +21,6 @@ set -euo pipefail
 APPS=(
   /usr/share/applications/google-chrome.desktop
   /usr/share/applications/firefox.desktop
-  /usr/share/applications/libreoffice-startcenter.desktop
   /usr/share/applications/code.desktop
   /usr/share/applications/postman.desktop
   /usr/share/applications/mate-terminal.desktop

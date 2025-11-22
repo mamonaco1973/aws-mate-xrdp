@@ -133,14 +133,7 @@ build {
     script          = "./firefox.sh"
     execute_command = "sudo -E bash '{{.Path}}'"
   }
-
-  # Install Libre Office
-
-  provisioner "shell" {
-    script          = "./libre.sh"
-    execute_command = "sudo -E bash '{{.Path}}'"
-  }
-
+  
   # Install VS Code
 
   provisioner "shell" {
