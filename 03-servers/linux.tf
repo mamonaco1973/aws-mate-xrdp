@@ -34,7 +34,7 @@ resource "aws_instance" "mate_instance" {
   # Defines the compute and memory capacity of the instance.
   # Selected as "m5.xlarge" for better performance with desktop workloads.
 
-  instance_type = "m6i.2xlarge"
+  instance_type = "m6i.xlarge"
 
   # ----------------------------------------------------------------------------------------------
   # Root Block Device
