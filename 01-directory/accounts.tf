@@ -35,7 +35,7 @@ resource "random_password" "admin_password" {
 
 # Create Secrets Manager container for Administrator credentials.
 resource "aws_secretsmanager_secret" "admin_secret" {
-  name        = "admin_ad_credentials"
+  name        = "admin_ad_credentials_mate"
   description = "Active Directory Administrator credentials"
 
   lifecycle {
