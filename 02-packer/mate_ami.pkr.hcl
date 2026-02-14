@@ -1,33 +1,45 @@
-# ==========================================================================================
-# Packer Build: MATE AMI on Ubuntu 24.04 (Noble)
-# ------------------------------------------------------------------------------------------
+# ================================================================================
+# FILE: mate.pkr.hcl
+# ================================================================================
+#
 # Purpose:
-#   - Uses Packer to build a custom Amazon Machine Image (AMI) for MATE XRDP
-#   - Starts from the official Canonical Ubuntu 24.04 AMI
-#   - Installs prerequisites (SSM agent, AWS CLI, packages, MATE Server)
-#   - Produces a tagged, timestamped AMI for later use in Terraform or EC2 launches
-# ==========================================================================================
+#   Build a custom Ubuntu 24.04 (Noble) AMI with the MATE desktop and XRDP
+#   enabled, plus common admin and development tooling.
+#
+# Design:
+#   - Base image: latest Canonical Ubuntu 24.04 AMI (Noble).
+#   - Builder: amazon-ebs (launch temp EC2, provision, create AMI).
+#   - Output: timestamped AMI name and tags for repeatable builds.
+#   - Provisioning: ordered shell scripts, executed with sudo.
+#
+# Notes:
+#   - subnet_id must allow outbound internet access for package installs.
+#   - Uses public_ip SSH during build for simplicity.
+#
+# ================================================================================
 
 
-# ------------------------------------------------------------------------------------------
-# Packer Plugin Configuration
-# - Defines the Amazon plugin required to interact with AWS
-# ------------------------------------------------------------------------------------------
+# ================================================================================
+# SECTION: Packer Plugin Configuration
+# ================================================================================
+
+# Define required plugins for interacting with AWS.
 packer {
   required_plugins {
     amazon = {
-      source  = "github.com/hashicorp/amazon" # Official HashiCorp Amazon plugin
-      version = "~> 1"                        # Any compatible version within major version 1
+      source  = "github.com/hashicorp/amazon"
+      version = "~> 1"
     }
   }
 }
 
 
-# ------------------------------------------------------------------------------------------
-# Data Source: Base Ubuntu 24.04 AMI
-# - Fetches the latest Canonical-owned AMI for Ubuntu Noble (24.04)
-# - Filters to use HVM virtualization and EBS-backed storage
-# ------------------------------------------------------------------------------------------
+# ================================================================================
+# SECTION: Base Ubuntu 24.04 AMI Lookup
+# ================================================================================
+
+# Fetch the most recent Canonical Ubuntu 24.04 (Noble) AMI.
+# - Filters to HVM virtualization and EBS-backed storage.
 data "amazon-ami" "ubuntu_2404" {
   filters = {
     name                = "ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*"
@@ -36,173 +48,173 @@ data "amazon-ami" "ubuntu_2404" {
   }
 
   most_recent = true
-  owners      = ["099720109477"] # Canonical’s AWS account ID
+  owners      = ["099720109477"]
 }
 
 
-# ------------------------------------------------------------------------------------------
-# Variables: Build-Time Inputs
-# - Control region, instance type, networking, and subnet placement
-# ------------------------------------------------------------------------------------------
+# ================================================================================
+# SECTION: Build-Time Variables
+# ================================================================================
+
+# Target AWS region for AMI build.
 variable "region" {
-  default = "us-east-1" # Default AWS region
+  default = "us-east-1"
 }
 
+# Instance type for the temporary builder host.
+# Using a larger instance can reduce build time for desktop/tool installs.
 variable "instance_type" {
-  default = "m5.2xlarge"  # Use a slightly larger instance so packer builds 
-                          # will run quicker.
+  default = "m5.2xlarge"
 }
 
+# VPC ID used for the temporary builder host.
+# Typically supplied by pipeline or environment wrapper.
 variable "vpc_id" {
-  description = "The ID of the VPC to use" # Supplied by user or pipeline
+  description = "The ID of the VPC to use"
   default     = ""
 }
 
+# Subnet ID used for the temporary builder host.
+# Must permit outbound internet access for apt and downloads.
 variable "subnet_id" {
-  description = "The ID of the subnet to use" # Supplied by user or pipeline
+  description = "The ID of the subnet to use"
   default     = ""
 }
 
 
-# ------------------------------------------------------------------------------------------
-# Amazon-EBS Source Block
-# - Launches a temporary EC2 instance from the base Ubuntu AMI
-# - Provisions software and configuration
-# - Creates a reusable AMI with a timestamp-based name
-# ------------------------------------------------------------------------------------------
-source "amazon-ebs" "mate_ami" {
-  region        = var.region                       # AWS region
-  instance_type = var.instance_type                # EC2 instance type
-  source_ami    = data.amazon-ami.ubuntu_2404.id   # Base Ubuntu 24.04 AMI
-  ssh_username  = "ubuntu"                         # Default SSH user for Ubuntu
-  ami_name      = "mate_ami_${replace(timestamp(), ":", "-")}" # Timestamped AMI name
-  ssh_interface = "public_ip"                      # Use public IP for provisioning
-  vpc_id        = var.vpc_id                       # Target VPC
-  subnet_id     = var.subnet_id                    # Target Subnet (must allow outbound internet)
+# ================================================================================
+# SECTION: Amazon-EBS Builder Source
+# ================================================================================
 
-  # Root EBS Volume Configuration
+# Launch a temporary EC2 instance, provision it, and capture an AMI.
+source "amazon-ebs" "mate_ami" {
+  region        = var.region
+  instance_type = var.instance_type
+  source_ami    = data.amazon-ami.ubuntu_2404.id
+  ssh_username  = "ubuntu"
+  ssh_interface = "public_ip"
+  vpc_id        = var.vpc_id
+  subnet_id     = var.subnet_id
+
+  # Name and tag AMI with a timestamp for uniqueness.
+  ami_name = format(
+    "mate_ami_%s",
+    replace(timestamp(), ":", "-")
+  )
+
+  # Configure root volume for desktop workload and tooling footprint.
   launch_block_device_mappings {
-    device_name           = "/dev/sda1" # Root device
-    volume_size           = "64"        # Root volume size in GiB
-    volume_type           = "gp3"       # gp3: cost-effective SSD
-    delete_on_termination = "true"      # Cleanup volume when instance terminates
+    device_name           = "/dev/sda1"
+    volume_size           = 64
+    volume_type           = "gp3"
+    delete_on_termination = true
   }
 
   tags = {
-    Name = "mate_ami_${replace(timestamp(), ":", "-")}" # Tag AMI with unique name
+    Name = format(
+      "mate_ami_%s",
+      replace(timestamp(), ":", "-")
+    )
   }
 }
 
 
-# ------------------------------------------------------------------------------------------
-# Build Block: Provisioning Scripts
-# - Executes setup scripts inside the temporary EC2 instance
-# - Each script installs a specific set of software or config
-# ------------------------------------------------------------------------------------------
+# ================================================================================
+# SECTION: Build Provisioners
+# ================================================================================
+
+# Execute provisioning scripts inside the temporary builder instance.
+# Each script is run with sudo and inherits environment variables (-E).
 build {
   sources = ["source.amazon-ebs.mate_ami"]
 
-  # Install base packages and dependencies
+  # Install base packages and dependencies.
   provisioner "shell" {
     script          = "./packages.sh"
     execute_command = "sudo -E bash '{{.Path}}'"
   }
 
-  # Install MATE Desktop
+  # Install MATE desktop environment.
   provisioner "shell" {
     script          = "./mate.sh"
     execute_command = "sudo -E bash '{{.Path}}'"
   }
 
-  # Install XRDP - RDP over X
+  # Install XRDP for remote desktop access.
   provisioner "shell" {
     script          = "./xrdp.sh"
     execute_command = "sudo -E bash '{{.Path}}'"
   }
 
-  # Install Google Chrome.
-
+  # Install Google Chrome browser.
   provisioner "shell" {
     script          = "./chrome.sh"
     execute_command = "sudo -E bash '{{.Path}}'"
   }
 
-  # Install Firefox
-
+  # Install Firefox browser.
   provisioner "shell" {
     script          = "./firefox.sh"
     execute_command = "sudo -E bash '{{.Path}}'"
   }
 
-  # Install VS Code
-
+  # Install Visual Studio Code.
   provisioner "shell" {
     script          = "./vscode.sh"
     execute_command = "sudo -E bash '{{.Path}}'"
   }
 
-  # Install HashiCorp Tools
-
+  # Install HashiCorp tooling (terraform, packer, etc.).
   provisioner "shell" {
     script          = "./hashicorp.sh"
     execute_command = "sudo -E bash '{{.Path}}'"
   }
 
-  # Install AWS CLI
-
+  # Install AWS CLI.
   provisioner "shell" {
     script          = "./awscli.sh"
     execute_command = "sudo -E bash '{{.Path}}'"
   }
 
-
-  # Install AZ CLI
-
+  # Install Azure CLI.
   provisioner "shell" {
     script          = "./azcli.sh"
     execute_command = "sudo -E bash '{{.Path}}'"
   }
 
-  # Install gcloud CLI
-
+  # Install Google Cloud CLI (gcloud).
   provisioner "shell" {
     script          = "./gcloudcli.sh"
     execute_command = "sudo -E bash '{{.Path}}'"
   }
 
-  # Install docker
-
+  # Install Docker engine and tooling.
   provisioner "shell" {
     script          = "./docker.sh"
     execute_command = "sudo -E bash '{{.Path}}'"
   }
 
-  # Install postman
-
+  # Install Postman client.
   provisioner "shell" {
     script          = "./postman.sh"
     execute_command = "sudo -E bash '{{.Path}}'"
   }
 
-  # Install OnlyOffice
-
+  # Install OnlyOffice desktop suite.
   provisioner "shell" {
     script          = "./onlyoffice.sh"
     execute_command = "sudo -E bash '{{.Path}}'"
   }
 
-  # Install krdc - RDP client
-
+  # Install KRDC (RDP client).
   provisioner "shell" {
     script          = "./krdc.sh"
     execute_command = "sudo -E bash '{{.Path}}'"
   }
 
-  # Install Desktop icons
-
+  # Configure desktop shortcuts / icons.
   provisioner "shell" {
     script          = "./desktop.sh"
     execute_command = "sudo -E bash '{{.Path}}'"
   }
-
 }

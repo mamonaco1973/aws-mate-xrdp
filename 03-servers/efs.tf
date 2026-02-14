@@ -1,28 +1,45 @@
-# ===================================================================
-# SECURITY GROUP: Allow NFS access for EFS
-# -------------------------------------------------------------------
-# This security group is dedicated to the Amazon EFS file system.
-# It allows inbound NFS traffic (TCP/2049) so that EC2 instances
-# in the same VPC can mount and use the EFS file system.
+# ================================================================================
+# FILE: efs.tf
+# ================================================================================
 #
-# NOTE: The current ingress rule opens NFS to the entire Internet
-# (0.0.0.0/0). This is acceptable for lab/demo purposes but is NOT
-# recommended for production. In production, restrict to trusted
-# security groups or CIDR ranges (e.g., your VPC subnets).
-# ===================================================================
+# Purpose:
+#   Provision an Amazon EFS file system and associated networking
+#   components for shared NFS storage within the mini-AD VPC.
+#
+# Design:
+#   - Dedicated security group for NFS (TCP/2049).
+#   - Encrypted EFS file system with idempotent creation token.
+#   - Mount targets created in specific subnets for EC2 access.
+#
+# Security Notes:
+#   - Ingress rule currently allows 0.0.0.0/0 for lab/demo simplicity.
+#   - Production environments should restrict ingress to trusted
+#     security groups or specific VPC CIDR ranges only.
+#
+# ================================================================================
+
+
+# ================================================================================
+# SECTION: Security Group (EFS NFS Access)
+# ================================================================================
+
+# Security group dedicated to the EFS file system.
+# Allows inbound NFS (TCP/2049) so EC2 instances can mount EFS.
 resource "aws_security_group" "efs_sg" {
-  name        = "efs-sg"
+  name        = "mate-efs-sg"
   description = "Security group allowing NFS traffic to EFS"
   vpc_id      = data.aws_vpc.ad_vpc.id
 
+  # Demo-only ingress rule. Restrict in production.
   ingress {
     description = "Allow inbound NFS traffic"
     from_port   = 2049
     to_port     = 2049
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] # Demo only — restrict in production
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
+  # Allow all outbound traffic.
   egress {
     description = "Allow all outbound traffic"
     from_port   = 0
@@ -32,48 +49,43 @@ resource "aws_security_group" "efs_sg" {
   }
 
   tags = {
-    Name = "efs-sg"
+    Name = "mate-efs-sg"
   }
 }
 
-# ===================================================================
-# EFS FILE SYSTEM: Managed NFS storage
-# -------------------------------------------------------------------
-# Creates a new Amazon EFS file system. By default, this is
-# accessible only within the VPC via mount targets (see below).
-#
-# - creation_token: Ensures idempotency; unique per file system.
-# - encrypted: Enables at-rest encryption for security.
-# ===================================================================
+
+# ================================================================================
+# SECTION: EFS File System
+# ================================================================================
+
+# Create encrypted Amazon EFS file system.
+# creation_token ensures idempotency across applies.
 resource "aws_efs_file_system" "efs" {
-  creation_token = "mcloud-efs"
+  creation_token = "mate-efs"
   encrypted      = true
 
   tags = {
-    Name = "mcloud-efs"
+    Name = "mate-efs"
   }
 }
 
-# ===================================================================
-# EFS MOUNT TARGETS: Connect EFS to a subnet
-# -------------------------------------------------------------------
-# Creates a mount target for the EFS file system inside the
-# "ad-subnet". A mount target is required in each Availability
-# Zone where you want EC2 instances to access the file system.
-#
-# If you need multi-AZ resilience, create one mount target
-# per AZ (not per subnet). Each AZ supports exactly one mount
-# target for a given EFS file system.
-# ===================================================================
+
+# ================================================================================
+# SECTION: EFS Mount Targets
+# ================================================================================
+
+# Mount target in VM subnet (public or utility zone).
+# One mount target per Availability Zone is recommended.
 resource "aws_efs_mount_target" "efs_mnt_1" {
   file_system_id  = aws_efs_file_system.efs.id
-  subnet_id       = data.aws_subnet.vm_subnet_1.id # Reference your specific subnet
+  subnet_id       = data.aws_subnet.vm_subnet_1.id
   security_groups = [aws_security_group.efs_sg.id]
 }
 
+# Mount target in AD subnet (private zone).
+# Enables private instances to access the same EFS file system.
 resource "aws_efs_mount_target" "efs_mnt_2" {
   file_system_id  = aws_efs_file_system.efs.id
-  subnet_id       = data.aws_subnet.ad_subnet.id # Reference your specific subnet
+  subnet_id       = data.aws_subnet.ad_subnet.id
   security_groups = [aws_security_group.efs_sg.id]
 }
-

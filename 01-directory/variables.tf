@@ -44,3 +44,15 @@ variable "user_base_dn" {
   type        = string
   default     = "CN=Users,DC=mcloud,DC=mikecloud,DC=com"
 }
+
+# ------------------------------------------------------------------------------
+# VARIABLE: vpc_name
+# ------------------------------------------------------------------------------
+# Purpose:
+#   - Logical name applied to the VPC resource.
+# ------------------------------------------------------------------------------
+variable "vpc_name" {
+  description = "Name for the VPC"
+  type        = string
+  default     = "mate-vpc"
+}

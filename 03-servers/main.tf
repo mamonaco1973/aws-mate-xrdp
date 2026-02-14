@@ -9,10 +9,16 @@ provider "aws" {
 
 
 data "aws_secretsmanager_secret" "admin_secret" {
-  name = "admin_ad_credentials" # Secret name for the admin user in AWS Secrets Manager
+  name = "admin_ad_credentials_mate" # Secret name for the admin user in AWS Secrets Manager
 }
 
 data "aws_subnet" "vm_subnet_1" {
+
+   filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.ad_vpc.id]
+  }
+
   filter {
     name   = "tag:Name"      # Match based on the 'Name' tag
     values = ["vm-subnet-1"] # Look for a subnet tagged as "vm-subnet-1"
@@ -20,6 +26,12 @@ data "aws_subnet" "vm_subnet_1" {
 }
 
 data "aws_subnet" "ad_subnet" {
+
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.ad_vpc.id]
+  }
+
   filter {
     name   = "tag:Name"      # Match based on the 'Name' tag
     values = ["ad-subnet"] # Look for a subnet tagged as "ad-subnet"
@@ -32,7 +44,7 @@ data "aws_subnet" "ad_subnet" {
 data "aws_vpc" "ad_vpc" {
   filter {
     name   = "tag:Name"
-    values = ["ad-vpc"] # Look for a VPC tagged as "ad-vpc"
+    values = [var.vpc_name] # Look for a VPC tagged as "ad-vpc"
   }
 }
 

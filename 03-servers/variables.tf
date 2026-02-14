@@ -34,3 +34,15 @@ variable "netbios" {
   type        = string
   default     = "MCLOUD"
 }
+
+# ------------------------------------------------------------------------------
+# VARIABLE: vpc_name
+# ------------------------------------------------------------------------------
+# Purpose:
+#   - Logical name applied to the VPC resource.
+# ------------------------------------------------------------------------------
+variable "vpc_name" {
+  description = "Name for the VPC"
+  type        = string
+  default     = "mate-vpc"
+}
