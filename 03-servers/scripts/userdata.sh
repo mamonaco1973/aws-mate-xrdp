@@ -1,6 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
+rm -f -r /root/userdata.log
 LOG="/root/userdata.log"
 mkdir -p "$(dirname "$LOG")"
 touch "$LOG"
@@ -21,11 +22,6 @@ trap 'rc=$?; echo "ERROR: exit=$rc line=$LINENO cmd=$BASH_COMMAND time=$(date -I
 # - Updates SSH/SSSD defaults for AD users.
 # - Configures Samba + Winbind.
 # - Applies sudo and permissions, then clones helper repos.
-
-# Section 0: Ensure AWS SSM Agent is installed and running.
-snap install amazon-ssm-agent --classic
-systemctl enable snap.amazon-ssm-agent.amazon-ssm-agent.service
-systemctl start  snap.amazon-ssm-agent.amazon-ssm-agent.service
 
 # Section 1: Update OS and install required packages.
 apt-get update -y
