@@ -139,7 +139,7 @@ EOT
 # NetBIOS name patch
 head -c 15 /etc/hostname > /tmp/netbios-name
 value="$(tr -d '-' < /tmp/netbios-name | tr '[:lower:]' '[:upper:]')"
-netbios="${value^^}"
+netbios="$${value^^}"
 sed -i "s/#netbios/netbios name=${netbios}/g" /etc/samba/smb.conf
 
 cat <<EOT > /etc/nsswitch.conf
