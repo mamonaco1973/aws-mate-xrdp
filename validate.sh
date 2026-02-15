@@ -54,7 +54,7 @@ print_kv() {
 # SECTION: Lookup Endpoints
 # ================================================================================
 
-windows_dns="$(get_public_dns_by_name_tag "windows-ad-admin")"
+windows_dns="$(get_public_dns_by_name_tag "mate-ad-admin")"
 mate_dns="$(get_public_dns_by_name_tag "mate-instance")"
 
 # ================================================================================

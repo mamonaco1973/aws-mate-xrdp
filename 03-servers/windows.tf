@@ -61,7 +61,7 @@ resource "aws_instance" "windows_ad_instance" {
 
   # Standard tagging for identification and automation.
   tags = {
-    Name = "windows-ad-admin"
+    Name = "mate-ad-admin"
   }
 
   # Ensure Linux Samba/EFS client exists before admin host configuration.
