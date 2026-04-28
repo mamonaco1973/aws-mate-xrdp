@@ -18,6 +18,10 @@ set -euo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
 
+# Snap seeds asynchronously on boot — removing before seed completes returns
+# exit code 10 and fails the Packer build under set -euo pipefail.
+sudo snap wait system seed.loaded
+
 sudo systemctl stop snap.amazon-ssm-agent.amazon-ssm-agent.service || true
 sudo snap remove --purge amazon-ssm-agent
 sudo snap remove --purge core22
