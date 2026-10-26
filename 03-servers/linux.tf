@@ -49,7 +49,7 @@ data "aws_ami" "latest_desktop_ami" {
 # SECTION: EC2 Instance (MATE Desktop)
 # ================================================================================
 
-# Launch Ubuntu 24.04 desktop instance integrated with AD and EFS.
+# Launch Ubuntu 26.04 desktop instance integrated with AD and EFS.
 resource "aws_instance" "mate_instance" {
 
   # AMI dynamically resolved from data source above.

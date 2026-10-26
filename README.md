@@ -1,238 +1,179 @@
-# AWS MATE XRDP Cloud Development Environment  
+# MATE XRDP Desktop + Active Directory on AWS
 
-This project provides a **complete cloud-based Linux desktop development environment**
-powered by **MATE + XRDP**, **Mini-Active Directory**, and **Amazon EFS** running on AWS.
+A cloud Linux workstation for every build on the channel. A **MATE** desktop
+on **Ubuntu 26.04 LTS**, reached over RDP (XRDP), joined to a **mini-AD**
+domain, with home directories on **Amazon EFS**. Users sign in with their AD
+account, and their files follow them to any desktop built from the same AMI.
 
-It is designed as a **universal dev workstation** that contains the full superset of
-tools, dependencies, and configurations used across all build projects on my channel.
+![MATE desktop over XRDP](xrdp.png)
 
-![xrdp](xrdp.png)
+| Piece | Where | Role |
+|---|---|---|
+| **MATE desktop** | public subnet | Packer-built AMI (MATE + XRDP + dev tools); joined to AD with SSSD at boot; RDP and SSH from the internet |
+| **Windows Server 2022** | public subnet | joined to AD; RSAT for managing users; maps the desktop's `/efs` share as `Z:` |
+| **mini-AD** (Samba DC) | private subnet | users, groups, POSIX IDs, DNS, Kerberos |
+| **Amazon EFS** | both subnets | `/home` and the shared `/efs` area, mounted over NFS with TLS |
+| **Secrets Manager** | regional | AD admin and user passwords |
+| **NAT gateway** | public subnet | outbound internet for the DC's private subnet |
 
-Instead of manually configuring a workstation for each tutorial, demo, or cloud
-project, this solution automatically provisions:
+## Architecture
 
-1. **A Custom MATE XRDP AMI (Packer)**
-   - Preloaded with Chrome, Firefox (deb), VS Code, Docker, KRDC, Postman  
-   - Includes all development tooling required across channel projects:  
-     **Packer, Terraform, Docker CLI, AWS CLI v2, Azure CLI, Google Cloud CLI**  
-   - Snap-free, clean, lightweight MATE desktop  
-   - XRDP fully configured with all required fixes and defaults  
-   - Desktop/panel icons, terminal emulator defaults, `/etc/skel` customizations  
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="architecture-dark.svg">
+  <img alt="Packer builds a MATE desktop AMI from Canonical's Ubuntu 26.04 LTS image, and the MATE desktop instance is launched from it. An RDP client reaches the MATE desktop over RDP or SSH, and a Windows Server 2022 admin host over RDP; both hosts are in the public subnet. The desktop mounts its home directories and a shared area from Amazon EFS over NFS, and shares that area to the Windows host over SMB. Both hosts read the AD join password from Secrets Manager and join the mini-AD domain controller, which sits in a private subnet and reaches the internet through a NAT gateway." src="architecture-light.svg">
+</picture>
 
-2. **A Mini Active Directory Domain (Terraform)**
-   - Samba-based AD Domain Controller  
-   - Domain users generated from a template with random passwords  
-   - Central authentication for Linux and Windows clients  
+Regenerate with `python3 make_diagram.py`.
 
-3. **Domain-Joined Linux Desktop Server (Terraform)**
-   - Deploys MATE XRDP instance using the Packer-built AMI  
-   - Automatically joins AD during boot 
-   - Consistent user profiles via `/etc/skel` provisioning  
+- **`01-directory/`**: the VPC (`mate-vpc`, 10.0.0.0/24), a public VM subnet,
+  a private DC subnet, the NAT gateway, and the
+  [`module-aws-mini-ad`](https://github.com/mamonaco1973/module-aws-mini-ad)
+  Samba DC with users and POSIX attributes from `users.json`. DHCP points VPC
+  DNS at the DC.
+- **`02-packer/`**: builds the MATE AMI from Canonical's Ubuntu 26.04 image:
+  `ubuntu-mate-desktop`, XRDP with a MATE session, the SSSD, realmd and Samba
+  packages, `amazon-efs-utils`, and the channel's tool set (Chrome, Firefox,
+  VS Code, Docker, Packer, Terraform, AWS/Azure/Google Cloud CLIs, Postman,
+  KRDC, OnlyOffice). The domain join is left to boot time, because a computer
+  account and keytab can't be baked into a shared image.
+- **`03-servers/`**: EFS and its mount targets, the MATE desktop and Windows
+  hosts, their IAM role and security groups.
 
-4. **Amazon EFS for Persistent Home Directories**
-   - Linux instances mount EFS via NFS  
-   - Provides persistent, centralized, scalable home directories  
-   - Perfect for multi-instance pools or demo clusters  
+## What's in the image
 
-The result is a **disposable, reproducible, cloud-hosted Linux workstation** that
-can be launched in minutes and used for **any build, automation, or cloud project**
-featured on the channel.  
+- **Snap is left as Ubuntu ships it.** Firefox and the SSM agent are snaps.
+  Chrome, VS Code, Postman and OnlyOffice come from `.deb` packages.
+- **Snaps work in an XRDP session** because `/etc/xrdp/startwm.sh` exports
+  `XAUTHORITY`. XRDP starts Xorg with `-auth .Xauthority` but doesn't export
+  the variable; snaps run with a redirected `$HOME`, so without it they fail
+  with "Authorization required".
+- **No polkit prompts in RDP sessions.** A polkit rule allows colour-profile
+  and package-refresh actions that otherwise ask for a password at login.
+- **New users get the desktop icons and defaults** from `/etc/skel`.
 
-![AWS diagram](aws-mate.png)
+## How sign-in works
+
+1. At boot the desktop mounts EFS (`/efs`, and `/home` from `/efs/home`),
+   reads the AD admin password from Secrets Manager, and joins the domain with
+   `realm join`. SSSD is set for short names (`jsmith`, not
+   `jsmith@mcloud.mikecloud.com`) and the POSIX IDs stored in AD.
+2. An RDP client connects to the desktop's public address on 3389. XRDP
+   checks the password through PAM and SSSD, creates the home directory on
+   EFS on first login, and starts MATE.
+3. Members of **`linux-admins`** (jsmith and rpatel) get passwordless sudo.
+4. The Windows host joins the same domain and maps the desktop's Samba share
+   of `/efs` as `Z:`, which holds this repository and the helper scripts.
+
+| User | Groups | sudo on the desktop |
+|---|---|---|
+| jsmith | mcloud-users, us, linux-admins | yes |
+| edavis | mcloud-users, us | no |
+| rpatel | mcloud-users, india, linux-admins | yes |
+| akumar | mcloud-users, india | no |
+
+## Security groups
+
+```
+internet ─3389, 22, 445─▶ MATE desktop ─2049─▶ EFS
+internet ─3389─────────▶ Windows ─445─▶ MATE desktop (Z: is /efs)
+```
+
+Both hosts are open to `0.0.0.0/0` on their ports; every login still needs
+an AD account. The DC has no public address. Admin access to both hosts is
+also available through **SSM Session Manager**.
 
 ## Prerequisites
 
 * [An AWS Account](https://aws.amazon.com/console/)
-* [Install AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) 
+* [Install AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
 * [Install Terraform](https://developer.hashicorp.com/terraform/install)
 * [Install Packer](https://developer.hashicorp.com/packer/install)
+* [Install jq](https://jqlang.github.io/jq/download/)
 
-If this is your first time watching our content, we recommend starting with this video: [AWS + Terraform: Easy Setup](https://youtu.be/BCMQo0CB9wk). It provides a step-by-step guide to properly configure Terraform, Packer, and the AWS CLI.
+If this is your first time watching our content, we recommend starting with
+this video: [AWS + Terraform: Easy Setup](https://youtu.be/BCMQo0CB9wk).
 
----
-
-## Download this Repository
+## Deploy
 
 ```bash
 git clone https://github.com/mamonaco1973/aws-mate-xrdp.git
 cd aws-mate-xrdp
+./apply.sh       # 1: VPC + mini-AD  2: MATE AMI (Packer)  3: EFS, desktop, Windows
 ```
 
----
+BUILD_TIMINGS
 
-## Build the Code
+`apply.sh` ends by running `validate.sh`, which prints the two hosts:
 
-Run [check_env](check_env.sh) to validate your environment, then run [apply](apply.sh) to provision the infrastructure.
+```
+===============================================================================
+VALIDATION RESULTS: AD + MATE DESKTOP
+===============================================================================
+
+Windows AD Admin Host:       ec2-203-0-113-10.compute-1.amazonaws.com
+MATE Desktop Host:           ec2-203-0-113-20.compute-1.amazonaws.com
+
+===============================================================================
+```
+
+## Try it
+
+1. Get a user's password from Secrets Manager:
+
+   ```bash
+   aws secretsmanager get-secret-value --secret-id jsmith_ad_credentials_mate \
+     --query SecretString --output text | jq -r .password
+   ```
+
+2. RDP to the **MATE Desktop Host** as `jsmith`. The MATE desktop opens, and
+   jsmith's home directory is created on EFS on first login. Try `id`,
+   `getent group linux-admins`, `sudo -l` and `df -h /home`.
+3. Sign out and sign in as `edavis`: the same desktop, no sudo.
+4. RDP to the **Windows AD Admin Host** as `MCLOUD\jsmith`. **Active Directory
+   Users and Computers** is installed, and `Z:` is the desktop's `/efs`.
+
+### Add a desktop user
+
+1. On the Windows host, open **Active Directory Users and Computers** and turn
+   on **View > Advanced Features**.
+2. Under the **Users** container of `mcloud.mikecloud.com`, create the user
+   (for example `mcloud`) and set a password.
+
+   ![Windows](windows.png)
+
+3. Get the next free `uidNumber`: run `Z:\aws-mate-xrdp\04-utils\getNextUID.bat`.
+4. In the user's **Attribute Editor**, set `uidNumber` to that value,
+   `gidNumber` to `10001` (`mcloud-users`), and `uid` to the login name.
+5. On **Member Of**, add `mcloud-users` (and `linux-admins` for sudo).
+6. On the desktop (SSM or SSH), `id mcloud` shows the new IDs and groups.
+
+   ![Linux](linux.png)
+
+7. RDP to the desktop as the new user.
+
+   ![mcloud](xrdp-mcloud.png)
+
+## Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| RDP rejects every AD password | The desktop hasn't finished its domain join. `aws ssm start-session --target <instance-id>`, then `sudo cat /root/userdata.log`. |
+| RDP connects, then closes | Check `/var/log/xrdp-sesman.log` and `~/.xsession-errors` on the desktop. The session runs `/etc/xrdp/startwm.sh`, which starts MATE. |
+| A snap app won't open its window | `echo $XAUTHORITY` in the session should print an absolute path. If not, `/etc/xrdp/startwm.sh` is missing the export. |
+| `id <user>` finds nothing | The user needs `uidNumber`, `gidNumber` and `uid` set in AD. SSSD caches lookups; `sudo sss_cache -E` clears it. |
+| `Z:` is missing on Windows | The Windows host joins the domain and reboots after deploy; give it about 10 minutes. |
+| Packer can't SSH to the build instance | The build instance runs in the public VM subnet behind a temporary security group that Packer creates. Check that outbound SSH (port 22) isn't blocked where you run Packer. |
+
+## Teardown
 
 ```bash
-develop-vm:~/aws-mate-xrdp$ ./apply.sh
-NOTE: Validating that required commands are found in your PATH.
-NOTE: aws is found in the current PATH.
-NOTE: terraform is found in the current PATH.
-NOTE: All required commands are available.
-NOTE: Checking AWS cli connection.
-NOTE: Successfully logged into AWS.
-Initializing the backend...
-Initializing provider plugins...
-- Reusing previous version of hashicorp/random from the dependency lock file
-- Reusing previous version of hashicorp/aws from the dependency lock file
-- Using previously-installed hashicorp/random v3.7.1
-- Using previously-installed hashicorp/aws v5.89.0
-
-Terraform has been successfully initialized!
-
-You may now begin working with Terraform. Try running "terraform plan" to see
-any changes that are required for your infrastructure. All Terraform commands
-should now work.
+./destroy.sh     # destroys phase 3, deregisters the AMIs, deletes the secrets, destroys phase 1
 ```
 
----
+## Notes
 
-### Build Results
-
-When the deployment completes, the following resources are created:
-
-- **Networking:**  
-  - A dedicated VPC with public and private subnets  
-  - Internet Gateway and optional NAT Gateway for controlled outbound access  
-  - Route tables configured to support AD, EFS, and the MATE XRDP servers  
-
-- **Security & IAM:**  
-  - Security groups for the domain controller, Linux desktop servers, Windows admin server, and EFS  
-  - IAM roles and policies allowing EC2 instances to:  
-    - Use AWS Secrets Manager to retrieve AD credentials  
-    - Mount EFS via NFS  
-    - Perform instance bootstrapping without exposing credentials  
-  - AD administrator and autogenerated user credentials stored securely in **AWS Secrets Manager**  
-
-- **Active Directory Server:**  
-  - Ubuntu-based EC2 instance running Samba 4 as the Domain Controller and DNS server  
-  - Configured Kerberos realm, DNS zone, and NetBIOS name  
-  - Domain users generated from a template with randomized passwords and stored in Secrets Manager  
-
-- **Amazon EFS:**  
-  - Elastic File System deployed with mount targets across private subnets  
-  - Security groups allowing NFS traffic (TCP/2049) from all XRDP servers  
-  - Serves as shared home directory storage for all Linux desktop instances  
-
-- **Packer-Built MATE XRDP AMI:**  
-  - Custom AMI containing:  
-    - MATE, XRDP, Chrome, Firefox (deb), VS Code  
-    - Development tools: **Packer, Terraform, Docker CLI, AWS CLI v2, Azure CLI, Google Cloud CLI**  
-    - KRDC, Postman, and all channel-wide prerequisites  
-  - `/etc/skel` configured for default desktop icons, terminal emulator, wallpaper  
-  - All XRDP fixes applied (session startup, terminal defaults, untrusted launcher, etc.)  
-
-- **Linux Desktop Instances (XRDP):**  
-  - EC2 instances deployed from the custom AMI  
-  - Automatically joined to Active Directory using credentials pulled from Secrets Manager  
-  - Home directories served from EFS via NFS  
-  - Ready-to-use cloud development desktops for any project on the channel  
-
-- **Windows Admin Server (Optional):**  
-  - Domain-joined Windows Server for running RSAT, ADUC, DNS tools  
-  - Useful for validation, troubleshooting, and Windows-based demo scenarios  
-
----
-
-### Users and Groups
-
-As part of this project, when the domain controller is provisioned, a set of sample **users** and **groups** are automatically created through Terraform-provisioned scripts running on the mini-ad server. These resources are intended for **testing and demonstration purposes**, showcasing how to automate user and group provisioning in a self-managed Active Directory environment.
-
-
-#### Groups Created
-
-| Group Name    | Group Category | Group Scope | gidNumber |
-|---------------|----------------|-------------|-----------|
-| mcloud-users  | Security       | Universal   | 10001     |
-| india         | Security       | Universal   | 10002     |
-| us            | Security       | Universal   | 10003     |
-| linux-admins  | Security       | Universal   | 10004     |
-
-#### Users Created and Group Memberships
-
-| Username | Full Name   | uidNumber | gidNumber | Groups Joined                    |
-|----------|-------------|-----------|-----------|-----------------------------------|
-| jsmith   | John Smith  | 10001     | 10001     | mcloud-users, us, linux-admins    |
-| edavis   | Emily Davis | 10002     | 10001     | mcloud-users, us                  |
-| rpatel   | Raj Patel   | 10003     | 10001     | mcloud-users, india, linux-admins |
-| akumar   | Amit Kumar  | 10004     | 10001     | mcloud-users, india               |
-
----
-
-#### Understanding `uidNumber` and `gidNumber` for Linux Integration
-
-The **`uidNumber`** (User ID) and **`gidNumber`** (Group ID) attributes are critical when integrating **Active Directory** with **Linux systems**, particularly in environments where **SSSD** ([System Security Services Daemon](https://sssd.io/)) or similar services are used for identity management. These attributes allow Linux hosts to recognize and map Active Directory users and groups into the **POSIX** (Portable Operating System Interface) user and group model.
-
-
-### Creating a New Desktop User
-
-Follow these steps to provision a new user in the Active Directory domain and validate their access to the Desktop.
-
-1. **Connect to the Domain Controller**  
-   - Log into the **`windows-ad-admin`** server via Remote Desktop (RDP).  
-   - Use the `rpatel` or `jsmith` credentials that were provisioned during cluster deployment.  
-
-2. **Launch Active Directory Users and Computers (ADUC)**  
-   - From the Windows Start menu, open **“Active Directory Users and Computers.”**  
-   - Enable **Advanced Features** under the **View** menu. This ensures you can access the extended attribute tabs (e.g., UID/GID mappings).  
-
-3. **Navigate to the Users Organizational Unit (OU)**  
-   - In the left-hand tree, expand the domain (e.g., `mcloud.mikecloud.com`).  
-   - Select the **Users** OU where all cluster accounts are managed.  
-
-4. **Create a New User Object**  
-   - Right-click the Users OU and choose **New → User.**  
-   - Provide the following:  
-     - **Full Name:** Descriptive user name (e.g., “Mike Cloud”).  
-     - **User Logon Name (User Principal Name / UPN):** e.g., `mcloud@mcloud.mikecloud.com`.  
-     - **Initial Password:** Set an initial password.
-
-![Windows](windows.png)
-
-5. **Assign a Unique UID Number**  
-   - Open **PowerShell** on the AD server.  
-   - Run the script located at:  
-     ```powershell
-     Z:\efs\aws-MATE-xrdp\04-utils\getNextUID.bat
-     ```  
-   - This script returns the next available **`uidNumber`** to assign to the new account.  
-
-6. **Configure Advanced Attributes**  
-   - In the new user’s **Properties** dialog, open the **Attribute Editor** tab.  
-   - Set the following values:  
-     - `gidNumber` → **10001** (the shared GID for the `mcloud-users` group).  
-     - `uid` → match the user’s AD login ID (e.g., `rpatel`).  
-     - `uidNumber` → the unique numeric value returned from `getNextUID.ps1`.  
-
-7. **Add Group Memberships**  
-   - Go to the **Member Of** tab.  
-   - Add the user to the following groups:  
-     - **mcloud-users** → grants standard Desktop access.  
-     - **us** (or other geographic/departmental group as applicable).  
-
-8. **Validate User on Linux**  
-   - Open an **AWS Systems Manager (SSM)** session to the **`MATE-instance`** instance.  
-   - Run the following command to confirm the user’s identity mapping:  
-     ```bash
-     id mcloud
-     ```  
-   - Verify that the output shows the correct **UID**, **GID**, and group memberships (e.g., `mcloud-users`).  
-
-![Linux](linux.png)
-
-9. **Validate Desktop Access**  
-   - Open the a RDP session to the desktop environment
-   - Log in with the new AD credentials.  
-
-![mcloud](xrdp-mcloud.png)
-
-### Clean Up Infrastructure  
-
-When you are finished testing, you can remove all provisioned resources with:  
-
-```bash
-./destroy.sh
-```
-
-This will use Terraform to delete the VPC, EC2 instances, IAM roles, security groups, and any other infrastructure created by the project. Secrets stored in AWS Secrets Manager will also be deleted unless retention policies are configured.
+- **Lab only.** RDP, SSH and SMB are open to the internet, and the join uses
+  the domain admin account. Restrict the security groups and use a dedicated
+  join account for anything more.
+- Users, groups and POSIX IDs are defined in
+  `01-directory/scripts/users.json.template`.

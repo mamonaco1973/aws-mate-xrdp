@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # ================================================================================
-# XRDP Installation and XFCE Session Configuration Script
+# XRDP Installation and MATE Session Configuration Script
 # ================================================================================
 # Description:
 #   Installs XRDP and replaces the default /etc/xrdp/startwm.sh script so that
@@ -20,7 +20,10 @@ set -euo pipefail
 # Step 1: Install XRDP
 # ================================================================================
 sudo apt-get update -y
-sudo apt-get install -y xrdp
+sudo apt-get install -y xrdp xorgxrdp
+
+# XRDP reads the private key of its TLS certificate (the snakeoil pair).
+sudo adduser xrdp ssl-cert
 
 # ================================================================================
 # Step 2: Replace /etc/xrdp/startwm.sh with MATE session launcher
@@ -42,8 +45,14 @@ if test -r ~/.profile; then
     . ~/.profile
 fi
 
+# XRDP starts Xorg with "-auth .Xauthority" but does not export XAUTHORITY.
+# Ordinary apps find ~/.Xauthority by default; snaps run with a redirected
+# $HOME and do not, so X refuses them ("Authorization required").
+# An absolute XAUTHORITY lets snapd hand the cookie to the snap.
+export XAUTHORITY="${XAUTHORITY:-$HOME/.Xauthority}"
+
 # Start MATE session
-mate-session
+exec mate-session
 
 EOF
 
@@ -86,3 +95,21 @@ auth required pam_env.so readenv=1 envfile=/etc/default/locale
 EOF
 
 echo "NOTE: Created /etc/pam.d/xrdp-sesman successfully."
+
+# ---------------------------------------------------------------------------------
+# Quiet polkit prompts in remote sessions
+# ---------------------------------------------------------------------------------
+# Remote sessions otherwise get polkit prompts for colour management and
+# package refreshes ("Authentication is required to create a color profile").
+
+mkdir -p /etc/polkit-1/rules.d
+cat >/etc/polkit-1/rules.d/45-xrdp-quiet.rules <<'EOF'
+polkit.addRule(function(action, subject) {
+  if (action.id.indexOf("org.freedesktop.color-manager.") === 0 ||
+      action.id === "org.freedesktop.packagekit.system-sources-refresh") {
+    return polkit.Result.YES;
+  }
+});
+EOF
+
+echo "NOTE: Polkit rule for XRDP sessions installed."

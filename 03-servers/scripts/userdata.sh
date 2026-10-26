@@ -117,7 +117,6 @@ winbind enum groups = yes
 winbind enum users = yes
 winbind cache time = 30
 idmap cache time = 60
-winbind negative cache time = 0
 
 [homes]
 comment = Home Directories
@@ -136,7 +135,7 @@ EOT
 head -c 15 /etc/hostname > /tmp/netbios-name
 value="$(tr -d '-' < /tmp/netbios-name | tr '[:lower:]' '[:upper:]')"
 netbios="$${value^^}"
-sed -i "s/#netbios/netbios name=${netbios}/g" /etc/samba/smb.conf
+sed -i "s/#netbios/netbios name=$${netbios}/g" /etc/samba/smb.conf
 
 cat <<EOT > /etc/nsswitch.conf
 passwd:     files sss winbind

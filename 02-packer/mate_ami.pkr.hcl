@@ -3,11 +3,11 @@
 # ================================================================================
 #
 # Purpose:
-#   Build a custom Ubuntu 24.04 (Noble) AMI with the MATE desktop and XRDP
+#   Build a custom Ubuntu 26.04 (Resolute) AMI with the MATE desktop and XRDP
 #   enabled, plus common admin and development tooling.
 #
 # Design:
-#   - Base image: latest Canonical Ubuntu 24.04 AMI (Noble).
+#   - Base image: latest Canonical Ubuntu 26.04 AMI (Resolute).
 #   - Builder: amazon-ebs (launch temp EC2, provision, create AMI).
 #   - Output: timestamped AMI name and tags for repeatable builds.
 #   - Provisioning: ordered shell scripts, executed with sudo.
@@ -35,14 +35,14 @@ packer {
 
 
 # ================================================================================
-# SECTION: Base Ubuntu 24.04 AMI Lookup
+# SECTION: Base Ubuntu 26.04 AMI Lookup
 # ================================================================================
 
-# Fetch the most recent Canonical Ubuntu 24.04 (Noble) AMI.
+# Fetch the most recent Canonical Ubuntu 26.04 (Resolute) AMI.
 # - Filters to HVM virtualization and EBS-backed storage.
-data "amazon-ami" "ubuntu_2404" {
+data "amazon-ami" "ubuntu_2604" {
   filters = {
-    name                = "ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*"
+    name                = "ubuntu/images/hvm-ssd-gp3/ubuntu-resolute-26.04-amd64-server-*"
     virtualization-type = "hvm"
     root-device-type    = "ebs"
   }
@@ -90,7 +90,7 @@ variable "subnet_id" {
 source "amazon-ebs" "mate_ami" {
   region        = var.region
   instance_type = var.instance_type
-  source_ami    = data.amazon-ami.ubuntu_2404.id
+  source_ami    = data.amazon-ami.ubuntu_2604.id
   ssh_username  = "ubuntu"
   ssh_interface = "public_ip"
   vpc_id        = var.vpc_id
