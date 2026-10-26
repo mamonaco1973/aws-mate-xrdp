@@ -62,8 +62,6 @@ resource "aws_instance" "mate_instance" {
   root_block_device {
     volume_type           = "gp3"
     volume_size           = 64
-    iops                  = 3000 # gp3 baseline; the AMI carries the build's
-    throughput            = 125  # faster settings, which aren't needed here
     delete_on_termination = true
   }
 

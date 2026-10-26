@@ -14,11 +14,6 @@ set -euo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
 
-# Build speed: dpkg fsyncs every file it unpacks, which makes the install
-# disk-bound. A build instance that crashes is simply thrown away, so skip
-# the fsyncs for the build; the last Packer provisioner removes this file.
-echo "force-unsafe-io" > /etc/dpkg/dpkg.cfg.d/99-packer-unsafe-io
-
 # Snap stays installed: the base AMI's SSM agent is a snap, and the XAUTHORITY
 # export in /etc/xrdp/startwm.sh (xrdp.sh) lets snaps open windows under XRDP.
 apt-get update -y
