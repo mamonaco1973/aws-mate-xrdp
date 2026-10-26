@@ -103,10 +103,15 @@ source "amazon-ebs" "mate_ami" {
   )
 
   # Configure root volume for desktop workload and tooling footprint.
+  # The build is bound by dpkg's small synced writes, so the build volume gets
+  # well above gp3's 3000 IOPS / 125 MB/s baseline. It only exists while
+  # Packer runs; 03-servers sets the desktop's own volume back to baseline.
   launch_block_device_mappings {
     device_name           = "/dev/sda1"
     volume_size           = 64
     volume_type           = "gp3"
+    iops                  = 16000
+    throughput            = 1000
     delete_on_termination = true
   }
 
@@ -216,5 +221,14 @@ build {
   provisioner "shell" {
     script          = "./desktop.sh"
     execute_command = "sudo -E bash '{{.Path}}'"
+  }
+
+  # Restore dpkg's normal fsync behaviour (turned off in packages.sh) before
+  # the image is taken, and flush everything to disk.
+  provisioner "shell" {
+    inline = [
+      "sudo rm -f /etc/dpkg/dpkg.cfg.d/99-packer-unsafe-io",
+      "sync",
+    ]
   }
 }
