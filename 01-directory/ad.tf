@@ -28,6 +28,7 @@ module "mini_ad" {
 
   depends_on = [
     aws_nat_gateway.ad_nat,
+    aws_route.private_default,
     aws_route_table_association.rt_assoc_ad_private
   ]
 }
@@ -49,10 +50,10 @@ module "mini_ad" {
 
 locals {
   users_json = templatefile("./scripts/users.json.template", {
-    USER_BASE_DN   = var.user_base_dn
-    DNS_ZONE       = var.dns_zone
-    REALM          = var.realm
-    NETBIOS        = var.netbios
+    USER_BASE_DN    = var.user_base_dn
+    DNS_ZONE        = var.dns_zone
+    REALM           = var.realm
+    NETBIOS         = var.netbios
     jsmith_password = local.passwords["jsmith"]
     edavis_password = local.passwords["edavis"]
     rpatel_password = local.passwords["rpatel"]
