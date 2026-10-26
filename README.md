@@ -101,7 +101,11 @@ cd aws-mate-xrdp
 ./apply.sh       # 1: VPC + mini-AD  2: MATE AMI (Packer)  3: EFS, desktop, Windows
 ```
 
-BUILD_TIMINGS
+A full run takes about 45 minutes: phase 1 about 12 minutes, the Packer
+build about 27, and phase 3 about 2. Each run of `apply.sh` builds a fresh
+AMI, and phase 3 always uses the newest one. After phase 3, the desktop needs
+about **5 minutes** to mount EFS and join the domain, and the Windows host
+about **10 minutes** to join and reboot.
 
 `apply.sh` ends by running `validate.sh`, which prints the two hosts:
 
@@ -159,6 +163,7 @@ MATE Desktop Host:           ec2-203-0-113-20.compute-1.amazonaws.com
 |---|---|
 | RDP rejects every AD password | The desktop hasn't finished its domain join. `aws ssm start-session --target <instance-id>`, then `sudo cat /root/userdata.log`. |
 | RDP connects, then closes | Check `/var/log/xrdp-sesman.log` and `~/.xsession-errors` on the desktop. The session runs `/etc/xrdp/startwm.sh`, which starts MATE. |
+| Firefox takes a minute to open the first time | Expected on a fresh instance: the snap's files are read from the AMI's snapshot on first use. Later launches are quick. |
 | A snap app won't open its window | `echo $XAUTHORITY` in the session should print an absolute path. If not, `/etc/xrdp/startwm.sh` is missing the export. |
 | `id <user>` finds nothing | The user needs `uidNumber`, `gidNumber` and `uid` set in AD. SSSD caches lookups; `sudo sss_cache -E` clears it. |
 | `Z:` is missing on Windows | The Windows host joins the domain and reboots after deploy; give it about 10 minutes. |
